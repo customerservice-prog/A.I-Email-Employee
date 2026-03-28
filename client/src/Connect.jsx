@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, Link, Navigate } from 'react-router-dom';
+import { getApiHeaders } from './api.js';
 
 export default function Connect() {
   const [search] = useSearchParams();
@@ -11,7 +12,7 @@ export default function Connect() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/auth/me', { credentials: 'include' })
+    fetch('/api/auth/me', { credentials: 'include', headers: getApiHeaders() })
       .then((r) => r.json())
       .then((j) => {
         if (cancelled) return;

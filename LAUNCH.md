@@ -5,7 +5,7 @@ Use this with your hosting provider’s secret manager. Never commit real creden
 ## Before first production deploy
 
 1. **Database** — Postgres only in production (`DATABASE_URL`). Run `npm run db:prepare` on a fresh DB, then `npm run db:migrate` on every release.
-2. **API secret** — `INBOXPILOT_API_SECRET` (see `npm run gen:api-secret`). Required in production; clients send `x-inboxpilot-key` or `Authorization: Bearer`.
+2. **API secret** — `INBOXPILOT_API_SECRET` (see `npm run gen:api-secret`). Required in production; clients send `x-inboxpilot-key` or `Authorization: Bearer`. For the Vite/React UI, set `VITE_INBOXPILOT_API_SECRET` to the **same** value at build time (`client/.env.production.local` or your CI env).
 3. **HTTPS** — Set `APP_BASE_URL` to your public API URL, `COOKIE_SECURE=true`, and `TRUST_PROXY=true` if TLS terminates at a proxy.
 4. **Sessions** — Dashboard auth uses the `inboxpilot_session` cookie; CORS must allow your UI origin (`CORS_ORIGINS` if needed).
 5. **Nylas** — `NYLAS_API_KEY`, `NYLAS_WEBHOOK_SECRET`, per-tenant grants via Connect (`NYLAS_CLIENT_ID`, callback `…/api/auth/nylas/callback`). Webhook URL: `https://<api-host>/api/webhook`.

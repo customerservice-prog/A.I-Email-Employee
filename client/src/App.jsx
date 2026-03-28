@@ -8,9 +8,10 @@ import {
   useSearchParams,
   Navigate,
 } from 'react-router-dom';
-import { apiGet, apiJson, uploadKb } from './api';
+import { apiGet, apiJson, getApiHeaders, uploadKb } from './api';
 import Login from './Login.jsx';
 import Connect from './Connect.jsx';
+import Register from './Register.jsx';
 
 function fmtTime(iso) {
   if (!iso) return '—';
@@ -597,7 +598,7 @@ function SettingsView() {
 function RequireAuth() {
   const [ok, setOk] = useState(null);
   useEffect(() => {
-    fetch('/api/auth/me', { credentials: 'include' })
+    fetch('/api/auth/me', { credentials: 'include', headers: getApiHeaders() })
       .then((r) => r.json())
       .then((j) => setOk(Boolean(j.success)))
       .catch(() => setOk(false));
@@ -655,6 +656,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
       <Route path="/connect" element={<Connect />} />
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { getApiHeaders } from './api.js';
 
 async function postGoogleCredential(credential) {
   const r = await fetch('/api/auth/google', {
     method: 'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getApiHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ credential }),
   });
   const j = await r.json().catch(() => ({}));
@@ -30,7 +31,10 @@ async function postPasswordLogin(email, password) {
 }
 
 async function finishSignInNavigate(navigate, next) {
-  const r = await fetch('/api/auth/me', { credentials: 'include' });
+  const r = await fetch('/api/auth/me', {
+    credentials: 'include',
+    headers: getApiHeaders(),
+  });
   const j = await r.json().catch(() => ({}));
   if (!j.success) {
     throw new Error('Session could not be loaded after sign-in.');
@@ -160,6 +164,11 @@ export default function Login() {
         <div className="brand" style={{ marginBottom: 24, fontSize: '1.25rem' }}>
           <span>✉</span> InboxPilot
         </div>
+        <p style={{ marginBottom: 12 }}>
+          <Link to="/register">Create an account</Link>
+          {' · '}
+          <span style={{ color: 'var(--muted)' }}>or sign in</span>
+        </p>
         <h1 className="page-title" style={{ marginBottom: 8 }}>
           Sign in
         </h1>
