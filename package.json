@@ -10,6 +10,7 @@
     "dev": "concurrently -n api,ui -c blue,magenta \"node server.js\" \"npm run client:dev\"",
     "client:dev": "npm run dev --prefix client",
     "client:install": "npm install --prefix client",
+    "client:env": "node scripts/sync-client-env-from-root.js",
     "build": "npm run build --prefix client",
     "db:setup": "node scripts/db-setup.js",
     "db:seed": "node scripts/seed-apply.js",
