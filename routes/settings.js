@@ -19,9 +19,7 @@ router.get('/', async (req, res) => {
       data: {
         ...data,
         openAiKeyConfigured: Boolean(process.env.OPENAI_API_KEY),
-        nylasConfigured: Boolean(
-          process.env.NYLAS_API_KEY && process.env.NYLAS_GRANT_ID
-        ),
+        nylasConfigured: Boolean(data.nylasGrantConfigured),
       },
       requestId,
     });

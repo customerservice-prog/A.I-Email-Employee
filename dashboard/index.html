@@ -99,7 +99,9 @@
     </div>
     <script>
       window.INBOXPILOT_API_SECRET = window.INBOXPILOT_API_SECRET || '';
-      /** @type {boolean|undefined} Set `true` to skip demo sign-in during local development. */
+      /** Same value as INBOXPILOT_MACHINE_KEY in .env — required if INBOXPILOT_SKIP_AUTH is true. */
+      window.INBOXPILOT_MACHINE_KEY = window.INBOXPILOT_MACHINE_KEY || '';
+      /** Skip browser login only when also providing machine key (maps to INBOXPILOT_MACHINE_TENANT). */
       window.INBOXPILOT_SKIP_AUTH = window.INBOXPILOT_SKIP_AUTH;
     </script>
     <script src="app.js"></script>

@@ -1,16 +1,18 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
 const fs = require('fs');
 const path = require('path');
 const { pool, ensureReady, hasDatabase } = require('./db/connection');
 const { requestIdMiddleware } = require('./middleware/requestId');
 const { errorHandler } = require('./middleware/errorHandler');
-const { apiLimiter, webhookLimiter } = require('./middleware/rateLimit');
+const { apiLimiter, webhookLimiter, authLimiter } = require('./middleware/rateLimit');
 const OpenAIModule = require('openai');
 const OpenAI = OpenAIModule.default || OpenAIModule;
 
 const webhookRouter = require('./routes/webhook');
+const authRouter = require('./routes/auth');
 const emailsRouter = require('./routes/emails');
 const draftRouter = require('./routes/draft');
 const sendRouter = require('./routes/send');
@@ -29,6 +31,7 @@ function buildApp() {
   }
 
   app.use(requestIdMiddleware);
+  app.use(cookieParser());
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -64,14 +67,17 @@ function buildApp() {
   const { apiSecretGate } = require('./middleware/apiSecret');
   app.use(apiSecretGate);
 
+  app.use('/api/auth', authLimiter, authRouter);
+
+  const sessionAuth = require('./middleware/sessionAuth');
+  app.use(sessionAuth);
+
   app.use('/api/emails', apiLimiter);
   app.use('/api/draft', apiLimiter);
   app.use('/api/send', apiLimiter);
   app.use('/api/knowledge', apiLimiter);
   app.use('/api/stats', apiLimiter);
   app.use('/api/settings', apiLimiter);
-
-  app.use(require('./middleware/auth'));
 
   app.get('/health', (req, res) => {
     res.json({
@@ -87,7 +93,8 @@ function buildApp() {
       database: false,
       openai: false,
       nylas_config: Boolean(
-        process.env.NYLAS_API_KEY && process.env.NYLAS_GRANT_ID
+        process.env.NYLAS_API_KEY &&
+          (process.env.NYLAS_GRANT_ID || process.env.NYLAS_CLIENT_ID)
       ),
     };
 

@@ -1,3 +1,6 @@
+# Local Postgres for production-like dev. DATABASE_URL example:
+# postgresql://inboxpilot:inboxpilot_dev@localhost:54329/inboxpilot
+# Then: npm run db:setup && npm run db:migrate
 services:
   postgres:
     image: postgres:16-alpine

@@ -1,4 +1,4 @@
-const { pool } = require('../db/connection');
+const { pool, hasDatabase } = require('../db/connection');
 const { sanitizeSettingsPatch } = require('../lib/validateApi');
 
 const DEFAULT_SETTINGS = {
@@ -20,11 +20,35 @@ function mergeSettings(row) {
 }
 
 async function getTenantRow(tenantKey) {
-  if (!pool) return null;
+  if (!hasDatabase() || !pool) return null;
   const r = await pool.query(`SELECT * FROM tenants WHERE tenant_key = $1`, [
     tenantKey,
   ]);
   return r.rows[0] || null;
+}
+
+/**
+ * Per-tenant Nylas grant. Env NYLAS_GRANT_ID applies only to tenant `default`
+ * (or all tenants when NYLAS_USE_ENV_GRANT_FALLBACK=true) for legacy single-mailbox deploys.
+ * @param {string} tenantKey
+ */
+async function getEffectiveNylasGrantId(tenantKey) {
+  const envGrant = (process.env.NYLAS_GRANT_ID || '').trim();
+  const globalFallback =
+    String(process.env.NYLAS_USE_ENV_GRANT_FALLBACK || '').toLowerCase() === 'true';
+  const allowEnvForTenant =
+    globalFallback || tenantKey === 'default';
+
+  if (!hasDatabase()) {
+    if (!envGrant || !allowEnvForTenant) return null;
+    return envGrant;
+  }
+
+  const row = await getTenantRow(tenantKey);
+  const fromDb = row?.nylas_grant_id && String(row.nylas_grant_id).trim();
+  if (fromDb) return fromDb;
+  if (!envGrant || !allowEnvForTenant) return null;
+  return envGrant;
 }
 
 /**
@@ -50,6 +74,7 @@ async function getTenantSettings(tenantKey) {
     row = await ensureTenant(tenantKey);
   }
   if (!row) {
+    const effective = await getEffectiveNylasGrantId(tenantKey);
     return {
       tenantKey,
       businessEmail: null,
@@ -60,8 +85,14 @@ async function getTenantSettings(tenantKey) {
         10
       ),
       settings: { ...DEFAULT_SETTINGS },
+      nylasConnectedEmail: null,
+      nylasGrantFromTenant: false,
+      nylasGrantConfigured: Boolean(
+        (process.env.NYLAS_API_KEY || '').trim() && effective
+      ),
     };
   }
+  const nylasGrantId = await getEffectiveNylasGrantId(tenantKey);
   return {
     tenantKey: row.tenant_key,
     businessEmail: row.business_email,
@@ -69,6 +100,13 @@ async function getTenantSettings(tenantKey) {
     displayModel: row.display_model || 'gpt-4o',
     autoSendThreshold: Number(row.auto_send_threshold) || 0.9,
     settings: mergeSettings(row),
+    nylasConnectedEmail: row.nylas_connected_email || null,
+    nylasGrantFromTenant: Boolean(
+      row.nylas_grant_id && String(row.nylas_grant_id).trim()
+    ),
+    nylasGrantConfigured: Boolean(
+      (process.env.NYLAS_API_KEY || '').trim() && nylasGrantId
+    ),
   };
 }
 
@@ -111,9 +149,56 @@ async function updateTenantSettings(tenantKey, patch) {
   return getTenantSettings(tenantKey);
 }
 
+/**
+ * @param {string} tenantKey
+ * @param {{ grantId: string, connectedEmail?: string | null }} nylas
+ */
+async function setTenantNylasGrant(tenantKey, nylas) {
+  if (!pool) {
+    throw new Error('Database not configured');
+  }
+  await ensureTenant(tenantKey);
+  await pool.query(
+    `UPDATE tenants SET
+        nylas_grant_id = $2,
+        nylas_connected_email = $3,
+        updated_at = NOW()
+     WHERE tenant_key = $1`,
+    [tenantKey, nylas.grantId, nylas.connectedEmail ?? null]
+  );
+  return getTenantRow(tenantKey);
+}
+
+/**
+ * When the mailbox matches the signed-in Google email, align business inbox fields.
+ * @param {string} tenantKey
+ * @param {{ grantEmail: string, userEmail: string }} emails
+ */
+async function applyAutoLinkedBusinessEmail(tenantKey, { grantEmail, userEmail }) {
+  const g = String(grantEmail || '')
+    .trim()
+    .toLowerCase();
+  const u = String(userEmail || '')
+    .trim()
+    .toLowerCase();
+  if (!g || !u || g !== u) return { linked: false };
+  await pool.query(
+    `UPDATE tenants SET
+        business_email = COALESCE(business_email, $2),
+        provider = COALESCE(provider, 'gmail'),
+        updated_at = NOW()
+     WHERE tenant_key = $1`,
+    [tenantKey, grantEmail.trim()]
+  );
+  return { linked: true };
+}
+
 module.exports = {
   getTenantSettings,
   updateTenantSettings,
   ensureTenant,
+  getEffectiveNylasGrantId,
+  setTenantNylasGrant,
+  applyAutoLinkedBusinessEmail,
   DEFAULT_SETTINGS,
 };

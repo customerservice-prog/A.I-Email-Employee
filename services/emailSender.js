@@ -1,4 +1,5 @@
 const Nylas = require('nylas').default;
+const { getEffectiveNylasGrantId } = require('./tenantSettings');
 
 const nylas = new Nylas({
   apiKey: process.env.NYLAS_API_KEY,
@@ -60,9 +61,10 @@ async function sendEmail({ to, subject, body, threadId, tenantId: _tenantId }) {
   if (!process.env.NYLAS_API_KEY) {
     throw new Error('Missing NYLAS_API_KEY');
   }
-  const grantId = process.env.NYLAS_GRANT_ID;
+  const tenantKey = (_tenantId && String(_tenantId).trim()) || 'default';
+  const grantId = await getEffectiveNylasGrantId(tenantKey);
   if (!grantId) {
-    throw new Error('Missing NYLAS_GRANT_ID');
+    throw new Error('Missing Nylas grant (connect Gmail in Settings or set NYLAS_GRANT_ID)');
   }
 
   const payload = {

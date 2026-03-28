@@ -165,3 +165,39 @@ WHERE e.external_message_id IN ('inboxpilot-seed-auto-1', 'inboxpilot-seed-auto-
   AND NOT EXISTS (
     SELECT 1 FROM send_log sl WHERE sl.email_id = e.id AND sl.success = TRUE
   );
+
+-- Minimal tenant KB so auto-send gate (requires parsed chunks) can pass for demos on `default`
+INSERT INTO kb_files (
+  tenant_id, filename, stored_path, mime_type, file_size_bytes, processing_status, chunk_count
+)
+SELECT
+  'default',
+  'inboxpilot-seed-faq.md',
+  'kb/seed/inboxpilot-seed-faq.md',
+  'text/markdown',
+  200,
+  'ready',
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM kb_files WHERE tenant_id = 'default' AND filename = 'inboxpilot-seed-faq.md'
+);
+
+INSERT INTO kb_chunks (tenant_id, kb_file_id, chunk_index, content, embeddings_meta)
+SELECT f.tenant_id, f.id, 0, E'Support hours\nMonday–Friday 9:00–18:00 US Eastern. Replies within one business day.', '{}'::jsonb
+FROM kb_files f
+WHERE f.tenant_id = 'default' AND f.filename = 'inboxpilot-seed-faq.md'
+  AND NOT EXISTS (
+    SELECT 1 FROM kb_chunks c WHERE c.kb_file_id = f.id AND c.chunk_index = 0
+  );
+
+INSERT INTO kb_chunks (tenant_id, kb_file_id, chunk_index, content, embeddings_meta)
+SELECT f.tenant_id, f.id, 1, E'Password reset\nUse the forgot-password flow from the sign-in screen. Links expire in two hours.', '{}'::jsonb
+FROM kb_files f
+WHERE f.tenant_id = 'default' AND f.filename = 'inboxpilot-seed-faq.md'
+  AND NOT EXISTS (
+    SELECT 1 FROM kb_chunks c WHERE c.kb_file_id = f.id AND c.chunk_index = 1
+  );
+
+UPDATE kb_files f
+SET chunk_count = (SELECT COUNT(*)::int FROM kb_chunks c WHERE c.kb_file_id = f.id)
+WHERE f.tenant_id = 'default' AND f.filename = 'inboxpilot-seed-faq.md';

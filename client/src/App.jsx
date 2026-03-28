@@ -1,6 +1,16 @@
 import { useEffect, useState, useCallback } from 'react';
-import { NavLink, Routes, Route, useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  NavLink,
+  Routes,
+  Route,
+  Outlet,
+  useNavigate,
+  useSearchParams,
+  Navigate,
+} from 'react-router-dom';
 import { apiGet, apiJson, uploadKb } from './api';
+import Login from './Login.jsx';
+import Connect from './Connect.jsx';
 
 function fmtTime(iso) {
   if (!iso) return '—';
@@ -17,7 +27,7 @@ function fmtPct(x) {
   return `${Math.round(Number(x) * 100)}%`;
 }
 
-function Layout({ children, pending, footerEmail, model, live }) {
+function Layout({ children, pending, footerEmail, model, live, onSignOut }) {
   return (
     <div className="app-layout">
       <aside className="sidebar">
@@ -51,6 +61,16 @@ function Layout({ children, pending, footerEmail, model, live }) {
             {footerEmail}
           </div>
           <div style={{ marginTop: 6 }}>{model}</div>
+          {onSignOut ? (
+            <button
+              type="button"
+              className="btn"
+              style={{ marginTop: 10, fontSize: '0.75rem', width: '100%' }}
+              onClick={onSignOut}
+            >
+              Sign out
+            </button>
+          ) : null}
         </footer>
       </aside>
       <main className="main">{children}</main>
@@ -495,7 +515,9 @@ function SettingsView() {
         <div className="panel">
           <h3>Email connection</h3>
           <p style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>
-            Connect via Nylas dashboard; grant ID in server .env.
+            Prefer signing in with Google and using{' '}
+            <a href="/connect">Connect inbox</a> (Nylas OAuth). Legacy single-mailbox: set{' '}
+            <code className="code-inline">NYLAS_GRANT_ID</code> for tenant <code className="code-inline">default</code>.
           </p>
           <input
             placeholder="Business email"
@@ -572,7 +594,25 @@ function SettingsView() {
   );
 }
 
-export default function App() {
+function RequireAuth() {
+  const [ok, setOk] = useState(null);
+  useEffect(() => {
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((j) => setOk(Boolean(j.success)))
+      .catch(() => setOk(false));
+  }, []);
+  if (ok === null) {
+    return <p className="page-desc" style={{ padding: 48 }}>Loading…</p>;
+  }
+  if (!ok) {
+    return <Navigate to="/login" replace />;
+  }
+  return <Outlet />;
+}
+
+function AppLayout() {
+  const navigate = useNavigate();
   const [pending, setPending] = useState(0);
   const [footerEmail, setFooterEmail] = useState('—');
   const [model, setModel] = useState('gpt-4o');
@@ -593,16 +633,40 @@ export default function App() {
       .catch(() => {});
   }, []);
 
+  const onSignOut = useCallback(async () => {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+    navigate('/login', { replace: true });
+  }, [navigate]);
+
   return (
-    <Layout pending={pending} footerEmail={footerEmail} model={model} live={live}>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/inbox" element={<Inbox />} />
-        <Route path="/review" element={<Review />} />
-        <Route path="/autopilot" element={<Autopilot />} />
-        <Route path="/knowledge" element={<Knowledge />} />
-        <Route path="/settings" element={<SettingsView />} />
-      </Routes>
+    <Layout
+      pending={pending}
+      footerEmail={footerEmail}
+      model={model}
+      live={live}
+      onSignOut={onSignOut}
+    >
+      <Outlet />
     </Layout>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/connect" element={<Connect />} />
+      <Route element={<RequireAuth />}>
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/inbox" element={<Inbox />} />
+          <Route path="/review" element={<Review />} />
+          <Route path="/autopilot" element={<Autopilot />} />
+          <Route path="/knowledge" element={<Knowledge />} />
+          <Route path="/settings" element={<SettingsView />} />
+        </Route>
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }

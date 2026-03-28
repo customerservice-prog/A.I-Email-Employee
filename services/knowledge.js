@@ -262,6 +262,19 @@ async function getKnowledgeChunksText(tenantId) {
 }
 
 /**
+ * Tenant-scoped parsed chunks only (used for auto-send safety gates).
+ * @param {string} tenantId
+ */
+async function countKbChunksForTenant(tenantId) {
+  if (!pool) return 0;
+  const r = await pool.query(
+    `SELECT COUNT(*)::int AS c FROM kb_chunks WHERE tenant_id = $1`,
+    [tenantId]
+  );
+  return r.rows[0]?.c ?? 0;
+}
+
+/**
  * Concatenated KB for classification / RAG: DB chunks first, then file bodies, then /kb disk.
  */
 async function getKnowledgeBase(tenantId) {
@@ -336,6 +349,7 @@ module.exports = {
   getKnowledgeBase,
   getKnowledgeContextForTenant,
   getKnowledgeFilePreview,
+  countKbChunksForTenant,
   chunkText,
   toPublicKbFile,
   UPLOADS_ROOT,

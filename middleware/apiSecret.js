@@ -29,6 +29,9 @@ function apiSecretGate(req, res, next) {
   if (path === '/api/webhook' || path.startsWith('/api/webhook/')) {
     return next();
   }
+  if (path === '/api/auth' || path.startsWith('/api/auth/')) {
+    return next();
+  }
 
   const secret = process.env.INBOXPILOT_API_SECRET;
   const isProd = process.env.NODE_ENV === 'production';

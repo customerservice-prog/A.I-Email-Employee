@@ -3,44 +3,39 @@ const API_BASE =
     ? `http://${window.location.hostname}:3042/api`
     : '/api';
 
-const TENANT_ID = 'default';
-const SESSION_KEY = 'inboxpilot_demo_session_v1';
+const AUTH_HINT = 'inboxpilot_auth_hint';
+
+/** @type {{ id: number, email: string, tenantKey: string } | null} */
+let currentUser = null;
+
+function machineKeyHeaders() {
+  const k =
+    typeof window !== 'undefined' && window.INBOXPILOT_MACHINE_KEY
+      ? String(window.INBOXPILOT_MACHINE_KEY).trim()
+      : '';
+  return k ? { 'x-inboxpilot-machine-key': k } : {};
+}
 
 function hasSession() {
   if (typeof window !== 'undefined' && window.INBOXPILOT_SKIP_AUTH === true) {
-    return true;
+    return Boolean(machineKeyHeaders()['x-inboxpilot-machine-key']);
   }
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    if (!raw) return false;
-    const j = JSON.parse(raw);
-    return Boolean(j && j.email);
-  } catch {
-    return false;
-  }
+  return localStorage.getItem(AUTH_HINT) === '1';
+}
+
+function markAuthed() {
+  localStorage.setItem(AUTH_HINT, '1');
+}
+
+function clearAuthed() {
+  localStorage.removeItem(AUTH_HINT);
 }
 
 function getSessionEmail() {
   if (typeof window !== 'undefined' && window.INBOXPILOT_SKIP_AUTH === true) {
-    return 'Development (auth skipped)';
+    return currentUser?.email || 'Machine key (dev)';
   }
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw).email : '';
-  } catch {
-    return '';
-  }
-}
-
-function setSession(email) {
-  localStorage.setItem(
-    SESSION_KEY,
-    JSON.stringify({ email: String(email || '').trim(), at: Date.now() })
-  );
-}
-
-function clearSession() {
-  localStorage.removeItem(SESSION_KEY);
+  return currentUser?.email || '';
 }
 
 function apiKeyHeaders() {
@@ -54,13 +49,13 @@ function apiKeyHeaders() {
 function jsonHeaders() {
   return {
     'Content-Type': 'application/json',
-    'x-tenant-id': TENANT_ID,
     ...apiKeyHeaders(),
+    ...machineKeyHeaders(),
   };
 }
 
-function tenantHeaders() {
-  return { 'x-tenant-id': TENANT_ID, ...apiKeyHeaders() };
+function apiHeaders() {
+  return { ...apiKeyHeaders(), ...machineKeyHeaders() };
 }
 
 function unwrapApiBody(body, res) {
@@ -74,9 +69,35 @@ function unwrapApiBody(body, res) {
   return body;
 }
 
+function handleUnauthorized(path) {
+  if (path === '/auth/me') return;
+  if (
+    /^\/auth\/(login|register|forgot-password|reset-password)$/.test(path)
+  ) {
+    return;
+  }
+  currentUser = null;
+  clearAuthed();
+  const h = window.location.hash || '';
+  if (
+    !h.includes('signin') &&
+    !h.includes('register') &&
+    !h.includes('reset') &&
+    !h.includes('forgot')
+  ) {
+    window.location.hash = '#/signin';
+  }
+}
+
 async function apiGet(path) {
-  const res = await fetch(`${API_BASE}${path}`, { headers: tenantHeaders() });
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: apiHeaders(),
+    credentials: 'include',
+  });
   const body = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    handleUnauthorized(path);
+  }
   return unwrapApiBody(body, res);
 }
 
@@ -84,10 +105,29 @@ async function apiJson(method, path, body) {
   const res = await fetch(`${API_BASE}${path}`, {
     method,
     headers: jsonHeaders(),
+    credentials: 'include',
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    handleUnauthorized(path);
+  }
   return unwrapApiBody(data, res);
+}
+
+async function refreshMe() {
+  if (window.INBOXPILOT_SKIP_AUTH === true) {
+    currentUser = { id: 0, email: 'Development', tenantKey: 'default' };
+    return;
+  }
+  try {
+    const d = await apiGet('/auth/me');
+    currentUser = d.user;
+    markAuthed();
+  } catch {
+    currentUser = null;
+    clearAuthed();
+  }
 }
 
 function escapeHtml(s) {
@@ -111,6 +151,7 @@ function parseRoute() {
   return {
     name,
     id: params.get('id'),
+    token: params.get('token'),
   };
 }
 
@@ -434,47 +475,174 @@ function onboardingChecklistHtml(ctx) {
 function viewSignIn(main) {
   main.innerHTML = `<div class="auth-screen">
     <div class="auth-card">
-      <h1>Sign in to InboxPilot</h1>
-      <p class="sub">Production teams plug in Clerk, Auth0, or Supabase here. For this build, sign-in is a local demo session only — nothing is sent to an auth provider.</p>
-      <div class="auth-banner">Use any work email and password to open the workspace. Replace this screen when you ship real authentication.</div>
+      <h1>Sign in</h1>
+      <p class="sub">Your workspace is isolated by account. The server sets an HTTP-only session cookie — tenant data is never selected from browser headers.</p>
+      <div id="auth-err"></div>
       <label for="auth-email">Work email</label>
       <input type="email" id="auth-email" autocomplete="username" placeholder="you@company.com" />
       <label for="auth-pass">Password</label>
-      <input type="password" id="auth-pass" autocomplete="current-password" placeholder="Enter any value" />
+      <input type="password" id="auth-pass" autocomplete="current-password" placeholder="••••••••" />
       <div class="auth-actions">
-        <button type="button" class="btn btn-primary" id="auth-submit">Continue to workspace</button>
+        <button type="button" class="btn btn-primary" id="auth-submit">Sign in</button>
       </div>
+      <p class="page-desc" style="margin-top:1rem;font-size:0.85rem">
+        <a href="#/register">Create an account</a> ·
+        <a href="#/forgot">Forgot password</a>
+      </p>
     </div>
   </div>`;
-  const go = () => {
-    const email = main.querySelector('#auth-email').value.trim() || 'operator@workspace.local';
-    setSession(email);
-    document.body.classList.remove('ip-guest');
-    const rib = document.getElementById('main-ribbon');
-    if (rib) rib.hidden = false;
-    syncRibbon();
-    window.location.hash = '#/dashboard';
-    render().catch(console.error);
+  const go = async () => {
+    const errEl = main.querySelector('#auth-err');
+    errEl.innerHTML = '';
+    const email = main.querySelector('#auth-email').value.trim();
+    const password = main.querySelector('#auth-pass').value;
+    try {
+      const data = await apiJson('POST', '/auth/login', { email, password });
+      currentUser = data.user;
+      markAuthed();
+      document.body.classList.remove('ip-guest');
+      const rib = document.getElementById('main-ribbon');
+      if (rib) rib.hidden = false;
+      syncRibbon();
+      window.location.hash = '#/dashboard';
+      await render();
+    } catch (e) {
+      errEl.innerHTML = `<div class="error-toast">${escapeHtml(e.message)}</div>`;
+    }
   };
-  main.querySelector('#auth-submit').addEventListener('click', go);
+  main.querySelector('#auth-submit').addEventListener('click', () => {
+    go().catch(console.error);
+  });
   main.querySelector('#auth-pass').addEventListener('keydown', (ev) => {
-    if (ev.key === 'Enter') go();
+    if (ev.key === 'Enter') go().catch(console.error);
+  });
+}
+
+function viewRegister(main) {
+  main.innerHTML = `<div class="auth-screen">
+    <div class="auth-card">
+      <h1>Create account</h1>
+      <p class="sub">Creates a dedicated tenant for your business. The first account on a seeded dev database may attach to the <code class="code-inline">default</code> tenant.</p>
+      <div id="reg-err"></div>
+      <label for="reg-email">Work email</label>
+      <input type="email" id="reg-email" autocomplete="username" />
+      <label for="reg-pass">Password (min 10 characters)</label>
+      <input type="password" id="reg-pass" autocomplete="new-password" />
+      <div class="auth-actions">
+        <button type="button" class="btn btn-primary" id="reg-submit">Sign up</button>
+      </div>
+      <p class="page-desc" style="margin-top:1rem;font-size:0.85rem"><a href="#/signin">Back to sign in</a></p>
+    </div>
+  </div>`;
+  main.querySelector('#reg-submit').addEventListener('click', async () => {
+    const errEl = main.querySelector('#reg-err');
+    errEl.innerHTML = '';
+    try {
+      const data = await apiJson('POST', '/auth/register', {
+        email: main.querySelector('#reg-email').value.trim(),
+        password: main.querySelector('#reg-pass').value,
+      });
+      currentUser = data.user;
+      markAuthed();
+      document.body.classList.remove('ip-guest');
+      const rib = document.getElementById('main-ribbon');
+      if (rib) rib.hidden = false;
+      syncRibbon();
+      window.location.hash = '#/dashboard';
+      await render();
+    } catch (e) {
+      errEl.innerHTML = `<div class="error-toast">${escapeHtml(e.message)}</div>`;
+    }
+  });
+}
+
+function viewForgot(main) {
+  main.innerHTML = `<div class="auth-screen">
+    <div class="auth-card">
+      <h1>Reset password</h1>
+      <p class="sub">We do not send email in this build. The server logs a one-time link; in development the API may return the URL in the response.</p>
+      <div id="fg-err"></div>
+      <label for="fg-email">Email</label>
+      <input type="email" id="fg-email" />
+      <div class="auth-actions">
+        <button type="button" class="btn btn-primary" id="fg-submit">Request link</button>
+      </div>
+      <p class="page-desc" style="margin-top:1rem;font-size:0.85rem"><a href="#/signin">Back to sign in</a></p>
+    </div>
+  </div>`;
+  main.querySelector('#fg-submit').addEventListener('click', async () => {
+    const errEl = main.querySelector('#fg-err');
+    errEl.innerHTML = '';
+    try {
+      const out = await apiJson('POST', '/auth/forgot-password', {
+        email: main.querySelector('#fg-email').value.trim(),
+      });
+      let html = `<div class="toast-success">${escapeHtml(out.message || 'Done.')}</div>`;
+      if (out.devResetUrl) {
+        html += `<p class="page-desc" style="margin-top:0.75rem"><a href="${escapeHtml(out.devResetUrl)}">Open reset link (dev)</a></p>`;
+      }
+      errEl.innerHTML = html;
+    } catch (e) {
+      errEl.innerHTML = `<div class="error-toast">${escapeHtml(e.message)}</div>`;
+    }
+  });
+}
+
+function viewReset(main, token) {
+  const t = token || '';
+  main.innerHTML = `<div class="auth-screen">
+    <div class="auth-card">
+      <h1>New password</h1>
+      <p class="sub">Choose a strong password (10+ characters).</p>
+      <div id="rs-err"></div>
+      <input type="hidden" id="rs-token" value="${escapeHtml(t)}" />
+      <label for="rs-pass">New password</label>
+      <input type="password" id="rs-pass" autocomplete="new-password" />
+      <div class="auth-actions">
+        <button type="button" class="btn btn-primary" id="rs-submit">Update password</button>
+      </div>
+      <p class="page-desc" style="margin-top:1rem;font-size:0.85rem"><a href="#/signin">Sign in</a></p>
+    </div>
+  </div>`;
+  main.querySelector('#rs-submit').addEventListener('click', async () => {
+    const errEl = main.querySelector('#rs-err');
+    errEl.innerHTML = '';
+    try {
+      await apiJson('POST', '/auth/reset-password', {
+        token: main.querySelector('#rs-token').value,
+        password: main.querySelector('#rs-pass').value,
+      });
+      errEl.innerHTML =
+        '<div class="toast-success">Password updated. You can sign in now.</div>';
+    } catch (e) {
+      errEl.innerHTML = `<div class="error-toast">${escapeHtml(e.message)}</div>`;
+    }
   });
 }
 
 function syncRibbon() {
   const el = document.getElementById('ribbon-email');
-  if (el) el.textContent = getSessionEmail() || 'Signed in';
+  if (el) {
+    const tk = currentUser?.tenantKey;
+    el.textContent = getSessionEmail()
+      ? `${getSessionEmail()}${tk ? ` · ${tk}` : ''}`
+      : 'Signed in';
+  }
   const lo = document.getElementById('ribbon-logout');
   if (lo && !lo._bound) {
     lo._bound = true;
     lo.addEventListener('click', () => {
-      clearSession();
-      document.body.classList.add('ip-guest');
-      const rib = document.getElementById('main-ribbon');
-      if (rib) rib.hidden = true;
-      window.location.hash = '#/signin';
-      render().catch(console.error);
+      apiJson('POST', '/auth/logout', {})
+        .catch(() => {})
+        .finally(() => {
+          currentUser = null;
+          clearAuthed();
+          document.body.classList.add('ip-guest');
+          const rib = document.getElementById('main-ribbon');
+          if (rib) rib.hidden = true;
+          window.location.hash = '#/signin';
+          render().catch(console.error);
+        });
     });
   }
 }
@@ -958,10 +1126,13 @@ async function viewReview(main, route) {
 
     const ta = rightEl.querySelector('#review-draft');
     const approveBtn = rightEl.querySelector('#btn-approve');
+    let approveInFlight = false;
 
     async function doApprove() {
+      if (approveInFlight) return;
       clearDraftError();
       const text = ta.value;
+      approveInFlight = true;
       approveBtn.disabled = true;
       const prevLabel = approveBtn.textContent;
       approveBtn.textContent = 'Sending…';
@@ -986,6 +1157,7 @@ async function viewReview(main, route) {
       } catch (err) {
         showDraftError(err.message || 'Send failed', doApprove);
       } finally {
+        approveInFlight = false;
         approveBtn.disabled = false;
         approveBtn.textContent = prevLabel;
       }
@@ -1262,7 +1434,8 @@ async function viewKnowledge(main) {
     fd.append('file', file);
     const res = await fetch(`${API_BASE}/knowledge/upload`, {
       method: 'POST',
-      headers: tenantHeaders(),
+      headers: apiHeaders(),
+      credentials: 'include',
       body: fd,
     });
     const out = await res.json().catch(() => ({}));
@@ -1492,7 +1665,10 @@ async function render() {
   const main = document.getElementById('main');
   const route = parseRoute();
 
-  if (hasSession() && route.name === 'signin') {
+  if (
+    hasSession() &&
+    ['signin', 'register', 'forgot', 'reset'].includes(route.name)
+  ) {
     window.location.hash = '#/dashboard';
     return;
   }
@@ -1501,6 +1677,21 @@ async function render() {
     document.body.classList.add('ip-guest');
     const rib = document.getElementById('main-ribbon');
     if (rib) rib.hidden = true;
+    if (route.name === 'register') {
+      viewRegister(main);
+      document.querySelectorAll('.nav a').forEach((a) => a.classList.remove('active'));
+      return;
+    }
+    if (route.name === 'forgot') {
+      viewForgot(main);
+      document.querySelectorAll('.nav a').forEach((a) => a.classList.remove('active'));
+      return;
+    }
+    if (route.name === 'reset') {
+      viewReset(main, route.token);
+      document.querySelectorAll('.nav a').forEach((a) => a.classList.remove('active'));
+      return;
+    }
     if (route.name !== 'signin') {
       window.location.hash = '#/signin';
     }
@@ -1547,5 +1738,11 @@ window.addEventListener('hashchange', () => {
 
 (async function init() {
   await updateSystemStatus();
+  if (window.INBOXPILOT_SKIP_AUTH === true) {
+    currentUser = { id: 0, email: 'Development', tenantKey: 'default' };
+    markAuthed();
+  } else {
+    await refreshMe();
+  }
   await render();
 })();

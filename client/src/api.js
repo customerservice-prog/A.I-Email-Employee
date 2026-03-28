@@ -1,12 +1,12 @@
-const TENANT = 'default';
-
 async function parseJson(res) {
   const j = await res.json().catch(() => ({}));
   return j;
 }
 
+const fetchOpts = { credentials: 'include' };
+
 export async function apiGet(path) {
-  const r = await fetch(path, { headers: { 'x-tenant-id': TENANT } });
+  const r = await fetch(path, fetchOpts);
   const j = await parseJson(r);
   if (!j.success) {
     throw new Error(j.error?.message || `HTTP ${r.status}`);
@@ -17,9 +17,9 @@ export async function apiGet(path) {
 export async function apiJson(method, path, body) {
   const r = await fetch(path, {
     method,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      'x-tenant-id': TENANT,
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
@@ -35,7 +35,7 @@ export function uploadKb(file) {
   fd.append('file', file);
   return fetch('/api/knowledge/upload', {
     method: 'POST',
-    headers: { 'x-tenant-id': TENANT },
+    credentials: 'include',
     body: fd,
   }).then(async (r) => {
     const j = await parseJson(r);

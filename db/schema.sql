@@ -12,6 +12,12 @@ CREATE TABLE IF NOT EXISTS tenants (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS nylas_grant_id TEXT;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS nylas_connected_email TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_nylas_grant_unique
+  ON tenants (nylas_grant_id)
+  WHERE nylas_grant_id IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS emails (
   id SERIAL PRIMARY KEY,
   tenant_id VARCHAR(255) NOT NULL DEFAULT 'default',
@@ -227,12 +233,16 @@ CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   tenant_key VARCHAR(255) NOT NULL REFERENCES tenants (tenant_key) ON DELETE CASCADE,
   email VARCHAR(255) NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
+  password_hash VARCHAR(255),
+  google_sub VARCHAR(255),
+  auth_provider VARCHAR(32) NOT NULL DEFAULT 'password',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower ON users (LOWER(email));
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub ON users (google_sub)
+  WHERE google_sub IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_users_tenant ON users (tenant_key);
 

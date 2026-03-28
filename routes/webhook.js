@@ -32,6 +32,42 @@ function webhookTenantId() {
   return process.env.WEBHOOK_TENANT_ID || 'default';
 }
 
+function denyUnknownMappedGrant() {
+  return (
+    String(process.env.WEBHOOK_DENY_UNKNOWN_GRANT || '').toLowerCase() ===
+    'true'
+  );
+}
+
+/**
+ * @returns {Promise<string|null>} tenant key, or null when grant is present but unmapped and WEBHOOK_DENY_UNKNOWN_GRANT=true
+ */
+async function resolveWebhookTenantId(payload) {
+  const grantIdRaw =
+    payload?.data?.grant_id ||
+    payload?.data?.grantId ||
+    payload?.grant_id ||
+    payload?.grantId;
+  const grantId = grantIdRaw != null ? String(grantIdRaw).trim() : '';
+  if (grantId && hasDatabase()) {
+    try {
+      const r = await pool.query(
+        `SELECT tenant_key FROM tenants WHERE nylas_grant_id = $1 LIMIT 1`,
+        [grantId]
+      );
+      if (r.rows[0]?.tenant_key) {
+        return r.rows[0].tenant_key;
+      }
+      if (denyUnknownMappedGrant()) {
+        return null;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return webhookTenantId();
+}
+
 function firstAddress(list) {
   if (!list || !list.length) return { email: '', name: '' };
   const x = list[0];
@@ -63,7 +99,6 @@ function extractMessagePayload(body) {
 }
 
 router.post('/', async (req, res) => {
-  const tenantId = webhookTenantId();
   const requestId = res.locals.requestId || 'webhook';
 
   const raw = req.body;
@@ -92,6 +127,24 @@ router.post('/', async (req, res) => {
     return res.status(400).json({
       success: false,
       error: { message: 'Invalid JSON', code: 'bad_payload' },
+      requestId,
+    });
+  }
+
+  const tenantId = await resolveWebhookTenantId(payload);
+  if (tenantId === null) {
+    const gid =
+      payload?.data?.grant_id ||
+      payload?.data?.grantId ||
+      payload?.grant_id ||
+      payload?.grantId;
+    logger.warn('webhook_unknown_grant_denied', {
+      requestId,
+      grantId: gid != null ? String(gid).slice(0, 80) : null,
+    });
+    return res.status(200).json({
+      success: true,
+      data: { skipped: true, reason: 'unknown_grant' },
       requestId,
     });
   }

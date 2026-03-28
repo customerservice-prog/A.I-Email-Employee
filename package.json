@@ -4,6 +4,7 @@
   "description": "InboxPilot — AI email triage (Nylas, OpenAI, PostgreSQL)",
   "main": "server.js",
   "scripts": {
+    "prestart": "node scripts/ensure-client-dist.js",
     "start": "node server.js",
     "server": "node server.js",
     "dev": "concurrently -n api,ui -c blue,magenta \"node server.js\" \"npm run client:dev\"",
@@ -13,7 +14,10 @@
     "db:setup": "node scripts/db-setup.js",
     "db:seed": "node scripts/seed-apply.js",
     "db:migrate": "node scripts/migrate.js",
+    "db:seed-test-users": "node scripts/seed-test-users.js",
+    "db:prepare": "npm run db:setup && npm run db:migrate",
     "gen:api-secret": "node scripts/generate-api-secret.js",
+    "setup:proceed": "node scripts/proceed-production-setup.js",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.cjs",
     "test:all": "npm run test && npm run test:integration",
@@ -34,18 +38,22 @@
   "homepage": "https://github.com/customerservice-prog/A.I-Email-Employee#readme",
   "dependencies": {
     "@electric-sql/pglite": "^0.2.17",
+    "@sentry/node": "^8.47.0",
+    "bcrypt": "^5.1.1",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "express-rate-limit": "^7.5.0",
+    "google-auth-library": "^9.15.1",
     "helmet": "^8.0.0",
     "html-to-text": "^9.0.5",
     "multer": "^1.4.5-lts.1",
+    "nodemailer": "^6.9.16",
     "nylas": "^8.0.5",
     "openai": "^4.73.0",
     "pdf-parse": "^1.1.1",
-    "pg": "^8.13.1",
-    "@sentry/node": "^8.47.0"
+    "pg": "^8.13.1"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",
