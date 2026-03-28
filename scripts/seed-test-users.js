@@ -27,6 +27,7 @@ async function main() {
     console.log('Already existed:', skipped.join(', '));
   }
   console.log(`Password for all seeded accounts: ${PASSWORD}`);
+  console.log('[InboxPilot] Reference: docs/TEST_ACCOUNTS.md');
 }
 
 main()
