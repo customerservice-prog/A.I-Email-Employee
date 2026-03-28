@@ -1,3 +1,22 @@
+/* Path-based /login and /register (bookmarks, OAuth return) → hash routes this UI actually reads */
+(function pathToHashAuth() {
+  try {
+    const p = (window.location.pathname || '').replace(/\/+$/, '') || '/';
+    if (p === '/login' || p === '/signin') {
+      const q = window.location.search || '';
+      window.location.replace(`${window.location.origin}/#/signin${q}`);
+      return;
+    }
+    if (p === '/register') {
+      const q = window.location.search || '';
+      window.location.replace(`${window.location.origin}/#/register${q}`);
+      return;
+    }
+  } catch {
+    /* ignore */
+  }
+})();
+
 const API_BASE =
   window.location.port === '3043' || window.location.port === '3000'
     ? `http://${window.location.hostname}:3042/api`

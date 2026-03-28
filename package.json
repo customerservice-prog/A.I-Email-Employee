@@ -16,6 +16,7 @@
     "db:seed": "node scripts/seed-apply.js",
     "db:migrate": "node scripts/migrate.js",
     "db:seed-test-users": "node scripts/seed-test-users.js",
+    "db:bootstrap-user": "node scripts/bootstrap-user.js",
     "db:prepare": "npm run db:setup && npm run db:migrate",
     "gen:api-secret": "node scripts/generate-api-secret.js",
     "setup:proceed": "node scripts/proceed-production-setup.js",
