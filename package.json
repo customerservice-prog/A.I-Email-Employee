@@ -1,0 +1,56 @@
+{
+  "name": "inboxpilot",
+  "version": "1.0.0",
+  "description": "InboxPilot — AI email triage (Nylas, OpenAI, PostgreSQL)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "server": "node server.js",
+    "dev": "concurrently -n api,ui -c blue,magenta \"node server.js\" \"npm run client:dev\"",
+    "client:dev": "npm run dev --prefix client",
+    "client:install": "npm install --prefix client",
+    "build": "npm run build --prefix client",
+    "db:setup": "node scripts/db-setup.js",
+    "db:seed": "node scripts/seed-apply.js",
+    "db:migrate": "node scripts/migrate.js",
+    "gen:api-secret": "node scripts/generate-api-secret.js",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.cjs",
+    "test:all": "npm run test && npm run test:integration",
+    "test:watch": "vitest",
+    "test:classify": "node test-classify.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/customerservice-prog/A.I-Email-Employee.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/customerservice-prog/A.I-Email-Employee/issues"
+  },
+  "homepage": "https://github.com/customerservice-prog/A.I-Email-Employee#readme",
+  "dependencies": {
+    "@electric-sql/pglite": "^0.2.17",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "html-to-text": "^9.0.5",
+    "multer": "^1.4.5-lts.1",
+    "nylas": "^8.0.5",
+    "openai": "^4.73.0",
+    "pdf-parse": "^1.1.1",
+    "pg": "^8.13.1",
+    "@sentry/node": "^8.47.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "serve": "^14.2.4",
+    "supertest": "^7.0.0",
+    "vitest": "^2.1.6"
+  }
+}

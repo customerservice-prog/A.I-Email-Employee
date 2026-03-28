@@ -1,0 +1,5 @@
+node_modules/
+.env
+*.log
+uploads/
+db/.pglite-data/

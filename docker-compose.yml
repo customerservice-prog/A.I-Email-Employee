@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: inboxpilot-postgres
+    environment:
+      POSTGRES_USER: inboxpilot
+      POSTGRES_PASSWORD: inboxpilot_dev
+      POSTGRES_DB: inboxpilot
+    ports:
+      - '54329:5432'
+    volumes:
+      - inboxpilot_pg:/var/lib/postgresql/data
+
+volumes:
+  inboxpilot_pg:

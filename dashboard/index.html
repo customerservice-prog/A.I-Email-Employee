@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>InboxPilot</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar" id="app-sidebar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 6h16v12H4z" stroke-linejoin="round" />
+              <path d="M4 8l8 5 8-5" />
+            </svg>
+          </div>
+          <span class="brand-text">InboxPilot</span>
+        </div>
+        <nav class="nav nav-wrap" aria-label="Primary">
+          <a href="#/dashboard" data-route="dashboard" title="Overview and health">
+            <span class="nav-ic" aria-hidden="true"
+              ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M9 22V12h6v10"/></svg></span
+            ><span class="nav-txt">Dashboard</span>
+          </a>
+          <a href="#/inbox" data-route="inbox" title="All processed email">
+            <span class="nav-ic" aria-hidden="true"
+              ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c.55 0 1 .45 1 1v14c0 .55-.45 1-1 1H4c-.55 0-1-.45-1-1V5c0-.55.45-1 1-1z"/><path d="M8 10h8M8 14h5"/></svg></span
+            ><span class="nav-txt">Inbox Feed</span>
+          </a>
+          <a href="#/review" data-route="review" title="Human approval queue">
+            <span class="nav-ic" aria-hidden="true"
+              ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span
+            ><span class="nav-txt">Review Queue</span>
+            <span class="badge" id="nav-review-badge" hidden>0</span>
+          </a>
+          <a href="#/autopilot" data-route="autopilot" title="Auto-sent audit log">
+            <span class="nav-ic" aria-hidden="true"
+              ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></span
+            ><span class="nav-txt">Auto-Pilot Log</span>
+          </a>
+          <a href="#/knowledge" data-route="knowledge" title="RAG documents">
+            <span class="nav-ic" aria-hidden="true"
+              ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg></span
+            ><span class="nav-txt">Knowledge Base</span>
+          </a>
+          <a href="#/settings" data-route="settings" title="Connection and automation">
+            <span class="nav-ic" aria-hidden="true"
+              ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></span
+            ><span class="nav-txt">Settings</span>
+          </a>
+        </nav>
+        <footer class="sidebar-footer">
+          <div class="footer-label">Integrations</div>
+          <div class="status-stack">
+            <div class="status-row" id="row-api" title="HTTP health check">
+              <span class="status-dot" id="live-dot"></span>
+              <span class="status-key">API</span>
+              <span class="status-val" id="val-api">—</span>
+            </div>
+            <div class="status-row" id="row-email" title="Nylas + grant">
+              <span class="status-dot status-dot--neutral" id="dot-email"></span>
+              <span class="status-key">Email</span>
+              <span class="status-val" id="val-email">—</span>
+            </div>
+            <div class="status-row" id="row-ai" title="OpenAI on server">
+              <span class="status-dot status-dot--neutral" id="dot-ai"></span>
+              <span class="status-key">AI</span>
+              <span class="status-val" id="val-ai">—</span>
+            </div>
+          </div>
+          <div class="footer-label" style="margin-top: 0.75rem">Operator inbox</div>
+          <div class="footer-meta" id="footer-email">—</div>
+          <div class="footer-label" style="margin-top: 0.65rem">Model</div>
+          <div class="footer-meta" id="footer-model">GPT-4o</div>
+        </footer>
+      </aside>
+      <div class="main-column">
+        <header class="main-ribbon" id="main-ribbon" hidden>
+          <div class="main-ribbon__inner">
+            <div class="main-ribbon__tenant">
+              <span class="main-ribbon__muted">Workspace</span>
+              <strong>Default</strong>
+            </div>
+            <div class="main-ribbon__spacer"></div>
+            <span class="main-ribbon__user" id="ribbon-email"></span>
+            <button type="button" class="btn btn-ribbon" id="ribbon-logout">Sign out</button>
+          </div>
+        </header>
+        <main class="main" id="main"></main>
+      </div>
+    </div>
+    <script>
+      window.INBOXPILOT_API_SECRET = window.INBOXPILOT_API_SECRET || '';
+      /** @type {boolean|undefined} Set `true` to skip demo sign-in during local development. */
+      window.INBOXPILOT_SKIP_AUTH = window.INBOXPILOT_SKIP_AUTH;
+    </script>
+    <script src="app.js"></script>
+  </body>
+</html>
